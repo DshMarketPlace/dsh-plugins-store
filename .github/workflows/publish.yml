@@ -49,5 +49,9 @@ jobs:
           test -s lib/index.js || { echo "lib/index.js missing" >&2; exit 1; }
           test -s lib/client.js || { echo "lib/client.js missing" >&2; exit 1; }
 
-      # No NODE_AUTH_TOKEN: this publishes through npm Trusted Publishing.
-      - run: npm publish --access public --loglevel verbose
+      # Publishes through npm Trusted Publishing. The OIDC exchange itself
+      # works — `POST /-/npm/v1/oidc/token/exchange` returns 201 and npm sets
+      # the token — but the registry has answered the PUT with 403 from inside
+      # `otplease`, which is npm's OTP path. If this fails again, the blocker
+      # is the account's 2FA-for-writes setting, not this workflow.
+      - run: npm publish --access public
