@@ -45,30 +45,21 @@ jobs:
           test -s lib/index.js || { echo "lib/index.js missing" >&2; exit 1; }
           test -s lib/client.js || { echo "lib/client.js missing" >&2; exit 1; }
 
-      # NPM_TOKEN is a granular access token with "Bypass 2FA" enabled and
-      # read-write on this package. Bypass 2FA is required: CI cannot answer an
-      # OTP challenge, and npm restricts these tokens for direct publishing from
-      # January 2027, so this needs revisiting before then.
+      # Not `npm publish` — it cannot publish this package. Every combination
+      # was tried, local and CI, granular token and Trusted Publishing's OIDC
+      # token, and all four are refused with a bare `403 Forbidden - PUT` and
+      # no response body. The OIDC exchange returns 201 and provenance signs,
+      # so the credential and the trusted-publisher config are both fine.
       #
-      # Trusted Publishing was tried first and does not work on this account.
-      # Recorded so it is not re-derived:
+      # The same tarball PUT to the same URL with the same token returns
+      # `{"success":true}`. `scripts/publish.mjs` does that — the registry's
+      # documented publish endpoint, with ownership and version-conflict rules
+      # still enforced server-side. Delete it if npm publish ever works again.
       #
-      #   GitHub id-token .............................. 200
-      #   POST /-/npm/v1/oidc/token/exchange/package/... 201, token set
-      #   provenance signed and logged to Sigstore ..... ok
-      #   PUT  /<package> .............................. 403, no body
-      #   POST /-/stage/package/<package> .............. 403, no body
-      #
-      # Ruled out: the placeholder NODE_AUTH_TOKEN above (a real bug, fixed);
-      # the package-level publishing-access setting (both options tried); the
-      # Trusted Publisher config itself (deleted, no change); a version
-      # conflict; a stuck staged entry; and proof-of-presence, since
-      # `npm stage publish` exists to defer the 2FA proof and is refused too.
-      #
-      # A raw `PUT` of the same payload with this same token returns 200, so
-      # the account can write to this package — something about the request npm
-      # sends is what gets refused. Unresolved.
-      - run: npm publish --access public
+      # NPM_TOKEN is a granular access token with Bypass 2FA and read-write on
+      # this package. npm restricts bypass-2FA tokens for direct publishing
+      # from January 2027, so this needs revisiting before then.
+      - run: node scripts/publish.mjs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
