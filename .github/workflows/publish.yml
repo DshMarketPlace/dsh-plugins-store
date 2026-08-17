@@ -15,10 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Deliberately no `registry-url`. Given one, setup-node writes an .npmrc
+      # containing `_authToken=${NODE_AUTH_TOKEN}` and defaults that variable
+      # to the literal placeholder `XXXXX-XXXXX-XXXXX-XXXXX`. npm then
+      # authenticates with the bogus token — a token outranks OIDC — and the
+      # publish fails 403 while still signing a valid provenance statement,
+      # which makes it look like trusted publishing is working.
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
 
       # OIDC publishing needs npm 11.5.1 or newer.
       - run: npm install -g npm@latest
