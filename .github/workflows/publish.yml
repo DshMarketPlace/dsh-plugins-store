@@ -49,20 +49,29 @@ jobs:
           test -s lib/index.js || { echo "lib/index.js missing" >&2; exit 1; }
           test -s lib/client.js || { echo "lib/client.js missing" >&2; exit 1; }
 
-      # Publishes through npm Trusted Publishing. The OIDC exchange itself
-      # works — `POST /-/npm/v1/oidc/token/exchange` returns 201 and npm sets
-      # the token — but the registry has answered the PUT with 403 from inside
-      # `otplease`, which is npm's OTP path. If this fails again, the blocker
-      # is the account's 2FA-for-writes setting, not this workflow.
-      - run: npm publish --access public --loglevel silly
-        id: publish
+      # Two-stage publish, because this account requires proof-of-presence
+      # (a live 2FA check) for a publish and CI cannot provide one. A direct
+      # `npm publish` is refused by the registry in 13ms — no auth round-trip,
+      # no response body — which reads like a broken credential and is not:
+      # the OIDC exchange succeeds and provenance signs fine.
+      #
+      # `npm stage publish` uploads the tarball and defers the 2FA proof. A
+      # human then approves it:
+      #
+      #     npm stage list
+      #     npm stage approve <stage-id>
+      #
+      # The trusted publisher grants both `npm publish` and `npm stage publish`
+      # for exactly this reason.
+      - run: npm stage publish --access public
 
-      # The registry puts its actual reason in the response body, which npm
-      # swallows from stdout but writes to the debug log.
+      - name: How to finish the publish
+        if: success()
+        run: |
+          echo "Staged. Approve it with 2FA to publish:"
+          echo "  npm stage list"
+          echo "  npm stage approve <stage-id>"
+
       - name: What the registry actually said
         if: failure()
-        run: |
-          echo "=== npm debug log ==="
-          tail -n 200 /home/runner/.npm/_logs/*-debug-0.log
-          echo "=== whoami with the OIDC token ==="
-          npm whoami --registry https://registry.npmjs.org || true
+        run: tail -n 60 /home/runner/.npm/_logs/*-debug-0.log
