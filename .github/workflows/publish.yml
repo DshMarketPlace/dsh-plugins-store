@@ -50,4 +50,4 @@ jobs:
           test -s lib/client.js || { echo "lib/client.js missing" >&2; exit 1; }
 
       # No NODE_AUTH_TOKEN: this publishes through npm Trusted Publishing.
-      - run: npm publish --access public
+      - run: npm publish --access public --loglevel verbose
