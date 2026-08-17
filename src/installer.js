@@ -7,7 +7,17 @@
  * is a supply-chain hole, not a feature.
  */
 
-const PREFIX = "dsh plugin add ";
+/**
+ * `dsh plugin --profile <name> add <target>`, with the profile optional
+ * because it was not always there.
+ *
+ * The catalogue emits the flag on every command — it has to, or nothing
+ * installs. This pattern originally matched only the flagless form, so once
+ * the catalogue started sending the correct command every install was refused
+ * as unsafe by its own guard. The profile captured here is discarded:
+ * `installArgs` substitutes the profile this plugin is actually running in.
+ */
+const COMMAND = /^dsh plugin(?: --profile [\w.-]+)? add (\S+)$/;
 
 // npm names must begin with a letter or digit — which is also what stops a
 // relative path from passing as one.
@@ -37,10 +47,10 @@ export function planFromCommand(command, fullName) {
 
   if (typeof command !== "string") reject();
 
-  const trimmed = command.trim();
-  if (!trimmed.startsWith(PREFIX)) reject();
+  const match = COMMAND.exec(command.trim());
+  if (!match) reject();
 
-  const target = trimmed.slice(PREFIX.length);
+  const target = match[1];
 
   // `..` anywhere is a traversal attempt, and neither an npm name nor a
   // GitHub subpath has any legitimate use for it.

