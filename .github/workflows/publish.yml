@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
@@ -15,18 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # Deliberately no `registry-url`. Given one, setup-node writes an .npmrc
-      # containing `_authToken=${NODE_AUTH_TOKEN}` and defaults that variable
-      # to the literal placeholder `XXXXX-XXXXX-XXXXX-XXXXX`. npm then
-      # authenticates with the bogus token — a token outranks OIDC — and the
-      # publish fails 403 while still signing a valid provenance statement,
-      # which makes it look like trusted publishing is working.
+      # `registry-url` writes an .npmrc wired to NODE_AUTH_TOKEN, which is what
+      # token auth needs. It was removed once while trying to make Trusted
+      # Publishing work — correctly, because that same .npmrc defaults the
+      # variable to the placeholder `XXXXX-XXXXX-XXXXX-XXXXX`, and a token,
+      # even a fake one, outranks OIDC. With a real token it belongs here.
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-
-      # OIDC publishing needs npm 11.5.1 or newer.
-      - run: npm install -g npm@latest
+          registry-url: https://registry.npmjs.org
 
       - run: npm ci
 
@@ -49,28 +45,32 @@ jobs:
           test -s lib/index.js || { echo "lib/index.js missing" >&2; exit 1; }
           test -s lib/client.js || { echo "lib/client.js missing" >&2; exit 1; }
 
-      # Trusted Publishing. This does not currently work on this account and
-      # the reason is not yet known — recorded here so it is not re-derived:
+      # NPM_TOKEN is a granular access token with "Bypass 2FA" enabled and
+      # read-write on this package. Bypass 2FA is required: CI cannot answer an
+      # OTP challenge, and npm restricts these tokens for direct publishing from
+      # January 2027, so this needs revisiting before then.
+      #
+      # Trusted Publishing was tried first and does not work on this account.
+      # Recorded so it is not re-derived:
       #
       #   GitHub id-token .............................. 200
       #   POST /-/npm/v1/oidc/token/exchange/package/... 201, token set
       #   provenance signed and logged to Sigstore ..... ok
-      #   PUT  /<package> .............................. 403 in 13ms, no body
-      #   POST /-/stage/package/<package> .............. 403 in 17ms, no body
+      #   PUT  /<package> .............................. 403, no body
+      #   POST /-/stage/package/<package> .............. 403, no body
       #
-      # The token is issued for this package specifically, then refused for
-      # every write, instantly and without explanation.
+      # Ruled out: the placeholder NODE_AUTH_TOKEN above (a real bug, fixed);
+      # the package-level publishing-access setting (both options tried); the
+      # Trusted Publisher config itself (deleted, no change); a version
+      # conflict; a stuck staged entry; and proof-of-presence, since
+      # `npm stage publish` exists to defer the 2FA proof and is refused too.
       #
-      # Ruled out: the placeholder NODE_AUTH_TOKEN that setup-node's
-      # `registry-url` injects (a real bug, fixed — a token outranks OIDC);
-      # the package-level publishing-access setting (changed, no effect); a
-      # version conflict (0.1.2 is 404); a stuck staged entry (none); and
-      # proof-of-presence, since `npm stage publish` exists precisely to defer
-      # the 2FA proof and is refused the same way.
-      #
-      # Until this is understood, publish from a machine that can answer a 2FA
-      # prompt:  npm publish --access public
+      # A raw `PUT` of the same payload with this same token returns 200, so
+      # the account can write to this package — something about the request npm
+      # sends is what gets refused. Unresolved.
       - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: What the registry actually said
         if: failure()
