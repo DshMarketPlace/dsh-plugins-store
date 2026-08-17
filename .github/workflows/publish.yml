@@ -49,28 +49,28 @@ jobs:
           test -s lib/index.js || { echo "lib/index.js missing" >&2; exit 1; }
           test -s lib/client.js || { echo "lib/client.js missing" >&2; exit 1; }
 
-      # Two-stage publish, because this account requires proof-of-presence
-      # (a live 2FA check) for a publish and CI cannot provide one. A direct
-      # `npm publish` is refused by the registry in 13ms — no auth round-trip,
-      # no response body — which reads like a broken credential and is not:
-      # the OIDC exchange succeeds and provenance signs fine.
+      # Trusted Publishing. This does not currently work on this account and
+      # the reason is not yet known — recorded here so it is not re-derived:
       #
-      # `npm stage publish` uploads the tarball and defers the 2FA proof. A
-      # human then approves it:
+      #   GitHub id-token .............................. 200
+      #   POST /-/npm/v1/oidc/token/exchange/package/... 201, token set
+      #   provenance signed and logged to Sigstore ..... ok
+      #   PUT  /<package> .............................. 403 in 13ms, no body
+      #   POST /-/stage/package/<package> .............. 403 in 17ms, no body
       #
-      #     npm stage list
-      #     npm stage approve <stage-id>
+      # The token is issued for this package specifically, then refused for
+      # every write, instantly and without explanation.
       #
-      # The trusted publisher grants both `npm publish` and `npm stage publish`
-      # for exactly this reason.
-      - run: npm stage publish --access public
-
-      - name: How to finish the publish
-        if: success()
-        run: |
-          echo "Staged. Approve it with 2FA to publish:"
-          echo "  npm stage list"
-          echo "  npm stage approve <stage-id>"
+      # Ruled out: the placeholder NODE_AUTH_TOKEN that setup-node's
+      # `registry-url` injects (a real bug, fixed — a token outranks OIDC);
+      # the package-level publishing-access setting (changed, no effect); a
+      # version conflict (0.1.2 is 404); a stuck staged entry (none); and
+      # proof-of-presence, since `npm stage publish` exists precisely to defer
+      # the 2FA proof and is refused the same way.
+      #
+      # Until this is understood, publish from a machine that can answer a 2FA
+      # prompt:  npm publish --access public
+      - run: npm publish --access public
 
       - name: What the registry actually said
         if: failure()
