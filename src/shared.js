@@ -24,6 +24,20 @@ export function hasRisk(plugin) {
   return Array.isArray(plugin.riskFlags) && plugin.riskFlags.length > 0;
 }
 
+/**
+ * Decides whether a settled `command/executed` should open the store overlay,
+ * and with what query. Pure and total: `result` may be `undefined` or an
+ * unexpected shape (host/runtime versions disagree on what the client ack
+ * carries), and this must never throw — the caller runs inside a host event
+ * whose failure can take down tool dispatch for the whole session.
+ */
+export function resolveStoreOpen(commandName, result) {
+  if (commandName === "store" && result?.kind === "success") {
+    return { open: true, query: result.query ?? "" };
+  }
+  return { open: false, query: "" };
+}
+
 /** In-process filter, for narrowing an already-fetched page. */
 export function filterLocally(results, query) {
   const q = query?.trim().toLowerCase();

@@ -1,6 +1,7 @@
 import { StoreOverlay, StoreSettingsTab } from "./components.jsx";
 import { StoreDialogController } from "./controller.js";
 import { NS, en, zh } from "./locales.js";
+import { resolveStoreOpen } from "./shared.js";
 import { installStyles } from "./styles.js";
 
 export const inject = ["slots", "locale", "sessions"];
@@ -13,9 +14,15 @@ export function apply(ctx) {
   ctx.effect(() => installStyles(), "dshmarketplace: styles");
 
   // `/store` on the host side resolves to success; that is the signal to open.
+  // This runs inside a host event: a throw here can escape into the runtime and
+  // crash tool dispatch for the whole session (some DSH builds do not contain a
+  // failing `command/executed` listener). Keep the body total — never throw.
   ctx.on("command/executed", (_sessionId, commandName, result) => {
-    if (commandName === "store" && result.kind === "success") {
-      dialogController.open(result.query ?? "");
+    try {
+      const { open, query } = resolveStoreOpen(commandName, result);
+      if (open) dialogController.open(query);
+    } catch (err) {
+      console.error("dshmarketplace: command/executed handler failed", err);
     }
   });
 
