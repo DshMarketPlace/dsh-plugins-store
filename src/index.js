@@ -1,6 +1,7 @@
 import { runNativeCommand } from "@deepseek-ai/dsh-native-command";
 
-import { fetchCatalog, describe, hasRisk, onlyVerified } from "./catalog.js";
+import { fetchCatalog, onlyVerified } from "./catalog.js";
+import { createApprovalGate } from "./gate.js";
 import { createInstallHandler, installPlan, send } from "./installer.js";
 import { currentProfile } from "./profile.js";
 import { createTools } from "./tools.js";
@@ -23,37 +24,6 @@ function runnerOptions(signal) {
     cliPath: process.argv[1],
     profile: PROFILE,
     signal,
-  };
-}
-
-/**
- * Nothing that reaches a terminal, a credential or an install script gets run
- * on the model's say-so. The catalogue already detects those; this turns the
- * detection into a stop.
- */
-function createApprovalGate() {
-  return async (event) => {
-    if (event?.tool?.name !== "dshmarketplace_install") return;
-
-    const fullName = event.arguments?.fullName;
-    if (!fullName) return;
-
-    const data = await fetchCatalog({ q: fullName, limit: 5 });
-    const plugin = (data.results ?? []).find((p) => p.fullName === fullName);
-    if (!plugin || !hasRisk(plugin)) return;
-
-    event.requireApproval?.({
-      title: `Install ${plugin.name}?`,
-      detail: [
-        `${plugin.fullName} — ${describe(plugin, "en")}`,
-        "",
-        `Detected: ${plugin.riskFlags.join(", ")}.`,
-        "Plugins run with this agent's permissions. Detection is heuristic;",
-        "an empty list would not have meant the plugin was safe.",
-        "",
-        plugin.url,
-      ].join("\n"),
-    });
   };
 }
 
