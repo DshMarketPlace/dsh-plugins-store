@@ -1,6 +1,6 @@
 import { defineTool } from "@deepseek-ai/dsh-tools";
 
-import { fetchCatalog } from "./catalog.js";
+import { fetchCatalog, onlyVerified } from "./catalog.js";
 import { installPlan, planFromPlugin } from "./installer.js";
 import { reportInstall } from "./telemetry.js";
 
@@ -66,7 +66,7 @@ export function createTools({ profile, runner, execPath, cliPath }) {
   const search = defineTool({
     name: "dshmarketplace_search",
     description:
-      "Search the DSH Marketplace catalogue of DeepSeek Harness plugins by capability, name or author. Returns install commands and detected risk flags. Use this before suggesting any plugin rather than recalling one from memory — the DSH ecosystem is days old and a remembered name is as likely to be wrong as right.",
+      "Search the DSH Marketplace catalogue of DeepSeek Harness plugins by capability, name or author. Returns install commands and detected risk flags. Every result already installed successfully in a clean sandbox; plugins that failed or were never tested are not returned. Use this before suggesting any plugin rather than recalling one from memory — the DSH ecosystem is days old and a remembered name is as likely to be wrong as right.",
     parameters: {
       query: {
         type: "string",
@@ -92,13 +92,19 @@ export function createTools({ profile, runner, execPath, cliPath }) {
       render: renderResults,
     },
     execute: async ({ query, category, limit }, exec) => {
-      const data = await fetchCatalog(
-        {
-          q: query,
-          category,
-          limit: Math.min(Number(limit) || 10, 30),
-        },
-        exec?.signal,
+      // Same bar as the store UI: only sandbox-passed plugins are offered.
+      // An agent that relays a failing install command fails in the user's
+      // transcript, under our name.
+      const data = onlyVerified(
+        await fetchCatalog(
+          {
+            q: query,
+            category,
+            limit: Math.min(Number(limit) || 10, 30),
+            installCheck: "passed",
+          },
+          exec?.signal,
+        ),
       );
 
       return {

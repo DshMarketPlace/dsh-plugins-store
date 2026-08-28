@@ -10,6 +10,13 @@ export { describe, hasRisk, filterLocally } from "./shared.js";
 const ENDPOINT =
   process.env.DSHM_API?.replace(/\/$/, "") ?? "https://dshmarketplace.dev";
 
+// Replaced by esbuild at build time; `typeof` keeps the unbuilt source (tests)
+// from throwing on the bare identifier. The header exists because a broken
+// 0.1.1 in the wild was undiagnosable server-side: the fetch carried nothing
+// that said which client, or which version, was asking.
+const VERSION =
+  typeof __DSHM_VERSION__ === "string" ? __DSHM_VERSION__ : "dev";
+
 const TIMEOUT_MS = 12_000;
 
 /** Cached per process. The catalogue changes hourly; a session does not. */
@@ -39,7 +46,10 @@ export async function fetchCatalog(params = {}, signal) {
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        "X-DSHM-Client": `dshmarketplace-plugin/${VERSION}`,
+      },
     });
     if (!res.ok) throw new Error(`catalogue responded ${res.status}`);
 
@@ -49,6 +59,20 @@ export async function fetchCatalog(params = {}, signal) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * The store offers only what the sandbox proved installs — a row that errors
+ * on click costs more trust than its absence buys. The API applies the same
+ * filter server-side (`installCheck=passed`); this pass exists for a
+ * `DSHM_API` pointed at an older deployment that ignores the parameter, and
+ * it drops untested rows too: null is not a pass.
+ */
+export function onlyVerified(data) {
+  return {
+    ...data,
+    results: (data.results ?? []).filter((p) => p.installCheck === "passed"),
+  };
 }
 
 export class CatalogStore {

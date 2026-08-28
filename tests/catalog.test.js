@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { catalogUrl, describe, hasRisk, filterLocally } from "../src/catalog.js";
+import {
+  catalogUrl,
+  describe,
+  hasRisk,
+  filterLocally,
+  onlyVerified,
+} from "../src/catalog.js";
 
 test("builds a catalogue URL and drops empty params", () => {
   const url = catalogUrl({ q: "memory", category: "", limit: 10 });
@@ -25,6 +31,25 @@ test("hasRisk is false only for an empty list", () => {
   assert.equal(hasRisk({ riskFlags: [] }), false);
   assert.equal(hasRisk({}), false);
   assert.equal(hasRisk({ riskFlags: ["terminal surface"] }), true);
+});
+
+// Failed, timeout, not-a-layer AND untested all go: a store row that errors
+// on install is worse than no row, and null is not a pass.
+test("onlyVerified keeps sandbox-passed rows and nothing else", () => {
+  const data = {
+    total: 4,
+    results: [
+      { fullName: "a/passed", installCheck: "passed" },
+      { fullName: "b/failed", installCheck: "failed" },
+      { fullName: "c/needs", installCheck: "needs-approval" },
+      { fullName: "d/untested", installCheck: null },
+    ],
+  };
+  assert.deepEqual(
+    onlyVerified(data).results.map((p) => p.fullName),
+    ["a/passed"],
+  );
+  assert.deepEqual(onlyVerified({}).results, []);
 });
 
 test("local filter searches both languages", () => {

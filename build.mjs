@@ -1,13 +1,13 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { build } from "esbuild";
 
 const root = new URL("./", import.meta.url);
 const outDir = new URL("./lib/", root);
 
+const pkg = JSON.parse(await readFile(new URL("./package.json", root), "utf8"));
+
 // Must match the package name — the loader keys the registry on it.
-const PACKAGE_ID = JSON.parse(
-  await (await import("node:fs/promises")).readFile(new URL("./package.json", root), "utf8"),
-).name;
+const PACKAGE_ID = pkg.name;
 
 await rm(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
@@ -21,6 +21,9 @@ await build({
   platform: "node",
   target: "node22",
   external: ["@deepseek-ai/dsh-native-command", "@deepseek-ai/dsh-tools"],
+  // The version the X-DSHM-Client header reports. Baked in at build time so
+  // the published bundle never has to locate its own package.json at runtime.
+  define: { __DSHM_VERSION__: JSON.stringify(pkg.version) },
   minify: true,
 });
 

@@ -1,6 +1,6 @@
 import { runNativeCommand } from "@deepseek-ai/dsh-native-command";
 
-import { fetchCatalog, describe, hasRisk } from "./catalog.js";
+import { fetchCatalog, describe, hasRisk, onlyVerified } from "./catalog.js";
 import { createInstallHandler, installPlan, send } from "./installer.js";
 import { currentProfile } from "./profile.js";
 import { createTools } from "./tools.js";
@@ -81,12 +81,17 @@ export function apply(ctx) {
     handler: async (req, res) => {
       const url = new URL(req.url, "http://localhost");
       try {
+        // The store lists only sandbox-passed plugins. An install button that
+        // errors is our name on someone else's screen; a listing that is
+        // absent is nothing. The full catalogue stays on the website, where a
+        // verdict badge can explain itself.
         const data = await fetchCatalog({
           q: url.searchParams.get("q") ?? undefined,
           category: url.searchParams.get("category") ?? undefined,
           limit: url.searchParams.get("limit") ?? 60,
+          installCheck: "passed",
         });
-        send(res, 200, data);
+        send(res, 200, onlyVerified(data));
       } catch (err) {
         send(res, 502, { error: err.message });
       }

@@ -6,9 +6,10 @@ export const NS = "dshmarketplace";
  */
 export const en = {
   title: "DSH Marketplace",
-  subtitle: "DeepSeek Harness plugins, one command away",
+  subtitle: "DeepSeek Harness plugins — every one here installed in a clean sandbox",
   search: "Search by capability, name or author…",
-  empty: "Nothing matched. Try a capability — memory, vision, terminal.",
+  empty:
+    "Nothing matched. Try a capability — memory, vision, terminal. Only install-tested plugins are listed here; the full catalogue is on dshmarketplace.dev.",
   loading: "Loading the catalogue…",
   error: "Could not reach the catalogue.",
   retry: "Retry",
@@ -33,9 +34,10 @@ export const en = {
 
 export const zh = {
   title: "DSH Marketplace",
-  subtitle: "DeepSeek Harness 插件，一行命令装好",
+  subtitle: "DeepSeek Harness 插件——摆出来的每个都在干净沙箱里装过一遍",
   search: "按能力、名称或作者搜索…",
-  empty: "没有匹配的。换个能力试试——记忆、视觉、终端。",
+  empty:
+    "没有匹配的。换个能力试试——记忆、视觉、终端。这里只摆实测装得过的，完整目录在 dshmarketplace.dev。",
   loading: "正在加载插件索引…",
   error: "连不上插件索引。",
   retry: "重试",
