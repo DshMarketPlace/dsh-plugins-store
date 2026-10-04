@@ -25,11 +25,13 @@ page per plugin rather than linking straight out to GitHub.
 
 ## Install
 
+Supports DSH **0.2.0-rc.2**, with support for the existing DSH 0.1 versions retained.
+
 ```bash
 dsh plugin --profile web add dshmarketplace-plugin
 ```
 
-Then `/store` in any session, or **Settings → Plugins → Plugin store**.
+Then `/store` in any session, or **Settings → Built-in plugins → Plugin marketplace**.
 
 `--profile` is not optional. `dsh plugin` forwards to pnpm inside a profile
 directory, so `dsh plugin add x` exits with *required option '--profile

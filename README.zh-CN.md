@@ -25,11 +25,13 @@
 
 ## 安装
 
+支持 DSH **0.2.0-rc.2**，同时保留对原有 DSH 0.1 版本的支持。
+
 ```bash
 dsh plugin --profile web add dshmarketplace-plugin
 ```
 
-装完在任意会话里打 `/store`，或者进 **设置 → 插件 → 插件市场**。
+装完在任意会话里打 `/store`，或者进 **设置 → 内置插件 → 插件市场**。
 
 `--profile` 不是可选的。`dsh plugin` 是把参数转发给 profile 目录里的 pnpm，
 所以 `dsh plugin add x` 会直接报 *required option '--profile &lt;name&gt;' not
