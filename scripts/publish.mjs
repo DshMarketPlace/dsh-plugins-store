@@ -39,16 +39,12 @@ function fail(message) {
 const token = process.env.NODE_AUTH_TOKEN ?? process.env.NPM_TOKEN;
 if (!token && !dryRun) fail("NODE_AUTH_TOKEN is not set.");
 
-// Publishing over an existing version is refused by the registry anyway, but
-// failing here gives a message that names the problem.
-const existing = await fetch(`${REGISTRY}/${name}`).then(
+// Avoid cached metadata while checking a just-published version.
+const metadataUrl = () => `${REGISTRY}/${name}?publish-check=${Date.now()}`;
+const existing = await fetch(metadataUrl()).then(
   (r) => (r.ok ? r.json() : null),
   () => null,
 );
-if (existing?.versions?.[version]) {
-  fail(`${name}@${version} is already published. Bump the version.`);
-}
-
 const tarball = `${name.replace(/^@/, "").replace("/", "-")}-${version}.tgz`;
 execFileSync("npm", ["pack", "--silent"], { stdio: ["ignore", "ignore", "inherit"] });
 const data = readFileSync(tarball);
@@ -87,6 +83,21 @@ if (dryRun) {
   process.exit(0);
 }
 
+const integrity = body.versions[version].dist.integrity;
+function isPublished(metadata) {
+  return metadata?.versions?.[version]?.dist?.integrity === integrity
+    && metadata?.["dist-tags"]?.latest === version;
+}
+
+if (existing?.versions?.[version]) {
+  rmSync(tarball, { force: true });
+  if (isPublished(existing)) {
+    console.log(`✓ ${name}@${version} is already published with the same tarball and latest tag`);
+    process.exit(0);
+  }
+  fail(`${name}@${version} already exists with a different tarball or latest tag. Inspect the registry before retrying.`);
+}
+
 const response = await fetch(`${REGISTRY}/${name}`, {
   method: "PUT",
   headers: {
@@ -105,16 +116,17 @@ console.log(`registry returned ${response.status}: ${text.replaceAll(token, "[re
 
 // The registry answers 200 before the version is queryable; confirm rather
 // than trust, because a silent no-op here would ship nothing and say nothing.
-for (let attempt = 0; attempt < 10; attempt++) {
-  await new Promise((r) => setTimeout(r, 3000));
-  const published = await fetch(`${REGISTRY}/${name}/${version}`, {
+for (let attempt = 0; attempt < 60; attempt++) {
+  await new Promise((r) => setTimeout(r, 5000));
+  const published = await fetch(metadataUrl(), {
     headers: { "cache-control": "no-cache" },
   });
-  if (published.ok) {
+  const metadata = published.ok ? await published.json() : null;
+  if (isPublished(metadata)) {
     console.log(`✓ published ${name}@${version}`);
     process.exit(0);
   }
-  if (attempt === 9) console.error(`version lookup returned HTTP ${published.status}`);
+  if (attempt % 6 === 5) console.log(`Waiting for registry metadata (${(attempt + 1) * 5}s; HTTP ${published.status})`);
 }
 
-fail(`registry accepted the upload but ${name}@${version} is not resolvable.`);
+fail(`registry accepted the upload but ${name}@${version} and its latest tag could not be verified within five minutes. Check the registry before retrying.`);
