@@ -101,16 +101,20 @@ const text = await response.text();
 rmSync(tarball, { force: true });
 
 if (!response.ok) fail(`registry returned ${response.status}: ${text.slice(0, 400)}`);
+console.log(`registry returned ${response.status}: ${text.replaceAll(token, "[redacted]").slice(0, 1000)}`);
 
 // The registry answers 200 before the version is queryable; confirm rather
 // than trust, because a silent no-op here would ship nothing and say nothing.
 for (let attempt = 0; attempt < 10; attempt++) {
   await new Promise((r) => setTimeout(r, 3000));
-  const published = await fetch(`${REGISTRY}/${name}/${version}`);
+  const published = await fetch(`${REGISTRY}/${name}/${version}`, {
+    headers: { "cache-control": "no-cache" },
+  });
   if (published.ok) {
     console.log(`✓ published ${name}@${version}`);
     process.exit(0);
   }
+  if (attempt === 9) console.error(`version lookup returned HTTP ${published.status}`);
 }
 
 fail(`registry accepted the upload but ${name}@${version} is not resolvable.`);
