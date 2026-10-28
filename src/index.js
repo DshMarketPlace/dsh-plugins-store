@@ -7,6 +7,7 @@ import { currentProfile } from "./profile.js";
 import { createTools } from "./tools.js";
 import { reportInstall } from "./telemetry.js";
 import { loadStoreSkill } from "./skill.js";
+import { addIndexCommand, setupMarketIndex } from "./market-index.js";
 
 export const name = "dshmarketplace-plugin";
 export const inject = ["commands", "webServer", "tools", "skills"];
@@ -16,6 +17,24 @@ const SEARCH_PATH = `${BASE}/search`;
 const INSTALL_PATH = `${BASE}/install`;
 
 const PROFILE = currentProfile();
+
+/** cordis exposes a scoped logger factory; anything else gets no logging. */
+function loggerOf(ctx) {
+  try {
+    const logger = ctx.logger;
+    return typeof logger === "function" ? logger("dshmarketplace") : logger;
+  } catch {
+    return undefined;
+  }
+}
+
+function profileDir(ctx) {
+  try {
+    return ctx.get?.("profileContext")?.dir;
+  } catch {
+    return undefined;
+  }
+}
 
 function runnerOptions(signal) {
   return {
@@ -36,6 +55,15 @@ export function apply(ctx) {
         ? { kind: "success" }
         : { kind: "success", query: rawInput.trim() },
   });
+
+  // One step to the index in Plugins → Discover (dsh 0.2.1-rc.2+). The
+  // automatic half runs once per profile; this is the explicit way back.
+  ctx.commands.register({
+    name: "store-index",
+    description: "Add the DSH Marketplace index to Plugins → Discover / 把 DSH Marketplace 索引加入「发现」",
+    handler: () => addIndexCommand(ctx, { dir: profileDir(ctx) }),
+  });
+  setupMarketIndex(ctx, { logger: loggerOf(ctx) });
 
   for (const tool of createTools(runnerOptions())) ctx.tools.register(tool);
   ctx.on("tools/pre-execute", createApprovalGate());
