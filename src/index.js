@@ -8,6 +8,7 @@ import { createTools } from "./tools.js";
 import { reportInstall } from "./telemetry.js";
 import { loadStoreSkill } from "./skill.js";
 import { addIndexCommand, setupMarketIndex } from "./market-index.js";
+import { ANY_SESSION, STORE_QUERY_PATH, createQueryInbox, sessionKeyOf } from "./shared.js";
 
 export const name = "dshmarketplace-plugin";
 export const inject = ["commands", "webServer", "tools", "skills"];
@@ -47,13 +48,31 @@ function runnerOptions(signal) {
 }
 
 export function apply(ctx) {
+  // dsh 0.1 hands the result to the client as is, so `query` rides on it there.
+  // dsh 0.2.1+ strips it, so the handler also parks it for the client to take
+  // from STORE_QUERY_PATH.
+  const storeQueries = createQueryInbox();
   ctx.commands.register({
     name: "store",
     description: "Browse DeepSeek Harness plugins from DSH Marketplace",
-    handler: ({ rawInput }) =>
-      rawInput.trim() === ""
-        ? { kind: "success" }
-        : { kind: "success", query: rawInput.trim() },
+    handler: ({ rawInput, agent } = {}) => {
+      const query = typeof rawInput === "string" ? rawInput.trim() : "";
+      if (!query) return { kind: "success" };
+      storeQueries.put(sessionKeyOf(agent) ?? ANY_SESSION, query);
+      return { kind: "success", query };
+    },
+  });
+  ctx.webServer.register({
+    kind: "exact",
+    path: STORE_QUERY_PATH,
+    handler: (req, res) => {
+      try {
+        const session = new URL(req.url, "http://localhost").searchParams.get("session") ?? "";
+        send(res, 200, { query: storeQueries.take(session) || storeQueries.take(ANY_SESSION) });
+      } catch {
+        send(res, 200, { query: "" });
+      }
+    },
   });
 
   // One step to the index in Plugins → Discover (dsh 0.2.1-rc.2+). The

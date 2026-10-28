@@ -49,3 +49,68 @@ export function filterLocally(results, query) {
       .some((field) => String(field).toLowerCase().includes(q)),
   );
 }
+
+/** Where the browser takes a parked `/store <query>`; served by the host half. */
+export const STORE_QUERY_PATH = "/api/dshmarketplace/store-query";
+
+/** Key for a query whose session the host could not name. */
+export const ANY_SESSION = "*";
+
+/**
+ * One-shot hand-off of a `/store <query>` from the command handler to the
+ * browser. dsh 0.2.1+ keeps only `kind`, `text` and `sourceEventSeq` of a
+ * command result (`normalizeResult` in @deepseek-ai/dsh-commands), so the
+ * query cannot ride on the result there; the handler parks it here by session
+ * and the client takes it once. Bounded and short-lived, because a query
+ * nobody takes (a dsh 0.1 client already had it on the result) must not pile up.
+ */
+export function createQueryInbox({ ttlMs = 60_000, max = 32, now = Date.now } = {}) {
+  const entries = new Map();
+  return {
+    put(key, query) {
+      if (typeof key !== "string" || !key || typeof query !== "string" || !query) return;
+      entries.delete(key);
+      entries.set(key, { query, at: now() });
+      while (entries.size > max) entries.delete(entries.keys().next().value);
+    },
+    take(key) {
+      const entry = typeof key === "string" ? entries.get(key) : undefined;
+      if (!entry) return "";
+      entries.delete(key);
+      return now() - entry.at <= ttlMs ? entry.query : "";
+    },
+  };
+}
+
+/** The id of the session a command ran in, or undefined. Never throws. */
+export function sessionKeyOf(agent) {
+  try {
+    const id = agent?.session?.id;
+    return typeof id === "string" && id ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Asks the host for the query parked by `/store <query>` in this session.
+ * Resolves to "" on any failure or after `timeoutMs`; never rejects, because
+ * the caller opens the store either way.
+ */
+export async function takeStoreQuery(sessionId, { fetchImpl = globalThis.fetch, timeoutMs = 1500 } = {}) {
+  const ctrl = typeof AbortController === "function" ? new AbortController() : undefined;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : undefined;
+  try {
+    const session = typeof sessionId === "string" ? sessionId : "";
+    const res = await fetchImpl(`${STORE_QUERY_PATH}?session=${encodeURIComponent(session)}`, {
+      signal: ctrl?.signal,
+    });
+    if (!res?.ok) return "";
+    const body = await res.json();
+    return typeof body?.query === "string" ? body.query : "";
+  } catch {
+    return "";
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
