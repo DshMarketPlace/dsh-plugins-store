@@ -25,13 +25,14 @@
 
 ## 安装
 
-支持 DSH **0.2.0-rc.2**，同时保留对原有 DSH 0.1 版本的支持。
+支持 DSH **0.1** 和 **0.2**（0.2.0-rc.2 到 0.2.2-alpha.2 都实际启动验证过）。
 
 ```bash
 dsh plugin --profile web add dshmarketplace-plugin
 ```
 
 装完在任意会话里打 `/store`，或者进 **设置 → 内置插件 → 插件市场**。
+DSH 0.2.1-rc.2 及以上，下次启动还会把 DSH Marketplace 索引加进 **插件 → 发现**，见下文。
 
 `--profile` 不是可选的。`dsh plugin` 是把参数转发给 profile 目录里的 pnpm，
 所以 `dsh plugin add x` 会直接报 *required option '--profile &lt;name&gt;' not
@@ -47,6 +48,15 @@ specified*，什么都不装。你要是用别的 profile，把 `web` 换掉。
 | **Agent 工具** | `dshmarketplace_search` 和 `dshmarketplace_install`，所以「帮我找个记忆插件装上」在对话里就能走通。 |
 | **随包 skill** | 让 agent 去搜，而不是凭训练记忆猜一个插件名——这个生态才几天，猜错的概率比猜对高。 |
 | **双语** | 每条记录都带手写的中英文描述。插件跟着你 DSH 的语言设置实时切换。 |
+| **「发现」标签** | DSH 0.2.1-rc.2+ 上，把[我们的插件索引](https://dshmarketplace.dev/market/index.json)加进 **插件 → 发现**。每一条都是沙箱实装过的那一版，标着它在哪个 dsh 版本上装通（预览通道测过之后，还会标出下一个 `next` / `alpha` 版本收不收它），可以按推荐、本周新增 Star、Star 和安装量排序。 |
+
+### 「发现」里的索引
+
+DSH 0.2.1-rc.2 加了一个实验性的 **自定义插件索引** 组件（插件 → 实验性插件），能在 **发现**
+标签里浏览第三方索引。插件会在每个 profile 里做一次：打开这个组件，并把
+`https://dshmarketplace.dev/market/index.json` 追加在你已有的索引源后面。不会重复添加，也不会动你的其他索引源。
+你之后关掉组件或删掉这个索引源，它不会再加回来——想恢复就打 `/store-index`。
+没有这个组件的 DSH（0.2.0 和 0.1）上什么都不做，`/store-index` 会说明原因。
 
 ## 安全
 
@@ -71,6 +81,8 @@ specified*，什么都不装。你要是用别的 profile，把 `web` 换掉。
 这个插件只往外发一样东西：安装成功之后，把该插件的公开标识发回去，用来统计
 真实安装量。没有机器 id、没有 session id、没有用户、没有搜索词，也没有任何
 其他遥测。搜索请求发给公开的目录 API 是为了拿结果，不带任何标识符。
+「发现」里的索引由 DSH 自己去拉，不经过这个插件；插件只在 profile 目录里留一个小标记文件
+`.dshmarketplace-plugin.json`，保证索引源只加一次。
 
 ```bash
 DSHM_NO_TELEMETRY=1    # 完全关掉安装量统计

@@ -25,13 +25,15 @@ page per plugin rather than linking straight out to GitHub.
 
 ## Install
 
-Supports DSH **0.2.0-rc.2**, with support for the existing DSH 0.1 versions retained.
+Supports DSH **0.1** and **0.2** (0.2.0-rc.2 through 0.2.2-alpha.2 checked by booting it).
 
 ```bash
 dsh plugin --profile web add dshmarketplace-plugin
 ```
 
 Then `/store` in any session, or **Settings → Built-in plugins → Plugin marketplace**.
+On DSH 0.2.1-rc.2 or later the next start also puts the DSH Marketplace index
+in **Plugins → Discover** — see below.
 
 `--profile` is not optional. `dsh plugin` forwards to pnpm inside a profile
 directory, so `dsh plugin add x` exits with *required option '--profile
@@ -48,6 +50,18 @@ you run another one.
 | **Agent tools** | `dshmarketplace_search` and `dshmarketplace_install`, so *"find me a memory plugin and set it up"* works in conversation. |
 | **Bundled skill** | Teaches the agent to search rather than recall a plugin name from training data — for an ecosystem this young, a remembered name is usually wrong. |
 | **Bilingual** | Every listing carries a hand-written English and Chinese description. The plugin follows your DSH language setting, live. |
+| **Discover tab** | On DSH 0.2.1-rc.2+, adds [our plugin index](https://dshmarketplace.dev/market/index.json) to **Plugins → Discover**. Every entry is a release our sandbox installed, labelled with the dsh version it installed on (and, once checked, whether the next `next` / `alpha` release accepts it), sortable by recommended, stars this week, stars and installs. |
+
+### The Discover index
+
+DSH 0.2.1-rc.2 added an experimental **Custom plugin indexes** bundle (Plugins →
+Experimental plugins) that browses third-party indexes in a **Discover** tab.
+Once per profile, the plugin switches that bundle on and appends
+`https://dshmarketplace.dev/market/index.json` after any sources you already
+have. It never adds the source twice and never touches your other sources. If
+you switch the bundle off or remove the source, it stays that way — run
+`/store-index` to put both back. On a DSH without the bundle (0.2.0 and 0.1),
+nothing happens and `/store-index` says why.
 
 ## Safety
 
@@ -77,6 +91,9 @@ The plugin sends exactly one thing anywhere: after a successful install, the
 plugin's public identifier, so install counts are real. No machine id, no
 session id, no user, no query, no telemetry of any other kind. Searches go to
 the public catalogue API in order to answer them and carry no identifiers.
+The Discover index is fetched by DSH itself, not by this plugin; the plugin
+only keeps a small marker, `.dshmarketplace-plugin.json`, in the profile
+directory so it adds the source once.
 
 ```bash
 DSHM_NO_TELEMETRY=1    # disables the install count entirely
